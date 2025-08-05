@@ -1,20 +1,32 @@
 {
   "manifest_version": 3,
-  "name": "Job Fraud Checker",
+  "name": "TrustGuard",
   "version": "1.0",
   "permissions": [
-    "activeTab",
-    "scripting"
+    "scripting",
+    "storage",
+    "notifications"
   ],
+  
   "host_permissions": [
-    "*://*/*"
+    "https://*.upwork.com/*",
+    "https://*.freelancer.com/*",
+    "https://*.fiverr.com/*",
+    "https://*.toptal.com/*",
+    "https://*.peopleperhour.com/*",
+    "https://*.guru.com/*",
+    "https://*.truelancer.com/*",
+    "https://*.flexjobs.com/*",
+    "https://*.outsourcely.com/*",
+    "https://*.workana.com/*",
+    "https://talent.hubstaff.com/*",
+    "https://*.taskrabbit.com/*",
+    "https://*.solidgigs.com/*",
+    "https://*.weworkremotely.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://*.googleapis.com/*"
   ],
-  "icons": {
-    "16": "icon16.png",
-    "32": "icon32.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  },
+
   "background": {
     "service_worker": "background.js"
   },
@@ -27,10 +39,35 @@
       "128": "icon128.png"
     }
   },
+
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://*.upwork.com/*",
+        "https://*.freelancer.com/*",
+        "https://*.fiverr.com/*",
+        "https://*.toptal.com/*",
+        "https://*.peopleperhour.com/*",
+        "https://*.guru.com/*",
+        "https://*.truelancer.com/*",
+        "https://*.flexjobs.com/*",
+        "https://*.outsourcely.com/*",
+        "https://*.workana.com/*",
+        "https://talent.hubstaff.com/*",
+        "https://*.taskrabbit.com/*",
+        "https://*.solidgigs.com/*",
+        "https://*.weworkremotely.com/*",
+        "https://generativelanguage.googleapis.com/*",
+        "https://*.googleapis.com/*"
+      ],
       "js": ["content.js"]
     }
-  ]
+  ],
+
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
 }

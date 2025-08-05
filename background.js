@@ -1,46 +1,125 @@
-// ---Replace with your API endpoint and API key 🔑---
-const API_ENDPOINT = 'https://api.theirstack.com/v1/jobs/search';
-const API_KEY = 'YOUR_API_KEY_HERE'; // ---Put your API key 🔑 here---
+const GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_API_KEY = "--key--";
 
-// ---Listen for messages from popup 🎉---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'checkJob') {
-    // ---Inject content script to get current tab's 💻 job details 📑---
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      const tabId = tabs[0].id;
-
-      // ---Send message 💭 to content script to extract job details---
-      chrome.tabs.sendMessage(tabId, { type: 'getJobDetails' }, (jobDetails) => {
-        if (!jobDetails || !jobDetails.job_title) {
-          sendResponse({ status: 'error' });
+  if (request.type === "checkJob" || request.type === "checkJobAuto") {
+    if (request.type === "checkJobAuto") {
+      chrome.storage.sync.get(["autoScanEnabled"], (result) => {
+        if (result.autoScanEnabled === false) {
+          sendResponse({ status: "off" });
           return;
         }
-
-        // --📲 Call API with extracted job details--
-        fetch(API_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(jobDetails)
-        })
-          .then(res => res.json())
-          .then(data => {
-            // ---Simplified example: check if any job found 🔍---
-            if (data && data.jobs && data.jobs.length > 0) {
-              sendResponse({ status: 'genuine' });
-            } else {
-              sendResponse({ status: 'suspicious' });
-            }
-          })
-          .catch(() => {
-            sendResponse({ status: 'error' });
-          });
+        callGeminiAPI(request.data, sender, sendResponse);
       });
-    });
+      return true; 
+    } else {
+      callGeminiAPI(request.data, sender, sendResponse);
+      return true;
+    }
+  }
 
-    // ---Return true to indicate async response 🗿---
+  if (request.type === "getHistory") {
+    chrome.storage.sync.get({ scanHistory: [] }, (result) => {
+      sendResponse({ scanHistory: result.scanHistory });
+    });
     return true;
   }
 });
+
+function callGeminiAPI(jobDetails, sender, sendResponse) {
+  if (!jobDetails || !jobDetails.job_title) {
+    sendResponse({ status: "error", message: "Job details missing." });
+    return;
+  }
+
+  const prompt = `
+    You are a reliable job/freelancer listing fraud detector AI.
+    Given the following information, answer ONLY with "GENUINE" if it appears created or managed by a real human and is likely legitimate,
+    or "SUSPICIOUS" if it appears automated, fake, risky, or fraudulent.
+    Please provide a one-line explanation.
+    Job Title: ${jobDetails.job_title}
+    Company: ${jobDetails.company || "N/A"}
+    Location: ${jobDetails.location || "N/A"}
+    Description: ${jobDetails.description || "N/A"}
+    Is this listing/profile GENUINE or SUSPICIOUS?
+    `;
+
+  fetch(`${GEMINI_API_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }]
+        }
+      ]
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+      return res.json();
+    })
+    .then((data) => {
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const replyLower = reply.toLowerCase();
+      let status;
+      if (replyLower.includes("genuine")) {
+        status = "genuine";
+      } else if (
+        replyLower.includes("suspicious") ||
+        replyLower.includes("fraud") ||
+        replyLower.includes("fake")
+      ) {
+        status = "suspicious";
+      } else {
+        status = "error";
+      }
+
+      if (status === "genuine") {
+        showPassedNotification(jobDetails);
+        savePassToHistory(jobDetails);
+      }
+
+      if (sender.tab?.id) {
+        chrome.tabs.sendMessage(sender.tab.id, {
+          type: "notifyStatus",
+          status,
+          message: reply,
+        });
+      }
+
+      sendResponse({ status, message: reply });
+    })
+    .catch((error) => {
+      console.error("Gemini API error:", error);
+      if (sender.tab?.id)
+        chrome.tabs.sendMessage(sender.tab.id, { type: "notifyStatus", status: "error" });
+      sendResponse({ status: "error", message: "API call failed." });
+    });
+}
+
+function showPassedNotification(job) {
+  const desc = job.description ? job.description.slice(0, 80).replace(/\n/g, " ") + (job.description.length > 80 ? "..." : "") : "";
+  chrome.notifications.create("scan-pass-" + Date.now(), {
+    type: "basic",
+    iconUrl: "icon48.png",
+    title: "✔️ Genuine Job/Profile Found",
+    message: `Title: ${job.job_title}\nCompany: ${job.company || "N/A"}\nLocation: ${job.location || "N/A"}\n${desc}`,
+  });
+}
+
+function savePassToHistory(job) {
+  chrome.storage.sync.get({ scanHistory: [] }, (result) => {
+    const history = result.scanHistory;
+    history.unshift({
+      job_title: job.job_title,
+      company: job.company,
+      location: job.location,
+      description: job.description,
+      date: Date.now()
+    });
+    if (history.length > 20) history.length = 20;
+    chrome.storage.sync.set({ scanHistory: history });
+  });
+}

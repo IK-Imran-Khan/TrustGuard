@@ -1,14 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Job Fraud Checker</title>
-  <link rel="stylesheet" href="popup.css" />
+  <meta charset="UTF-8">
+  <title>TrustGuard</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div id="status">Click "Check Job" to verify listing.</div>
-  <button id="checkBtn">Check Job</button>
-
+  <div id="status">Loading...</div>
+  <label class="switch">
+    <input type="checkbox" id="toggleScan" />
+    <span class="slider"></span>
+  </label>
+  <span id="toggleLabel"></span>
+  <hr>
+  <div id="historyTitle" style="font-weight: bold; margin-top:10px;">Scan History</div>
+  <div id="history"></div>
   <script src="popup.js"></script>
 </body>
 </html>
